@@ -4,7 +4,7 @@
 
 ## Prerequisites
 - Download the Nutanix Kubernetes Platform (NKP) CLI/binary and Konvoy Image Builder (KIB) from Nutanix Portal [here](https://portal.nutanix.com/page/downloads?product=nkp). Choose your appropriate OS and the version.
-- A container engine of some kind i.e. Docker or Podman. Docker Desktop is usually not supported in some enterprises so you may need to use Podman.
+- A container engine of some kind i.e. Docker or Podman. Docker Desktop is usually not supported in some enterprises so you may need to use Podman, containerd, etc. In my case I used Rancher Desktop with `QEMU` emulation and `dockerd` for the container runtime engine on a arm64 MacOS machine.
 - A container registry for your environment
 - A valid Nutanix account
 - A properly configured Prism Central with administrator access with the following credentials
