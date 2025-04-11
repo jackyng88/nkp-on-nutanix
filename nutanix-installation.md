@@ -2,6 +2,17 @@
 
 - This is a simple installation guide for Nutanix Kubernetes Platform v2.14 on simple AHV VMs and usiing a Linux/MacOS machine.
 
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Setting up a Subnet in Prism Central](#setting-up-a-subnet-in-prism-central)
+- [Creating a Storage Container in Prism Central](#creating-a-storage-container-in-prism-central)
+- [Configuring Prism Central Authorization Policy and Role](#configuring-prism-central-authorization-policy-and-role)
+- [Adding a Base Image for use with NKP](#adding-a-base-image-for-use-with-nkp)
+- [Deploying an NKP Cluster](#deploying-an-nkp-cluster)
+- [Adding Harbor Container Registry to the Cluster](#adding-harbor-container-registry-to-the-cluster)
+    - [Deploying CloudNativePG](#deploying-cloudnativepg)
+    - [Adding Nutanix Object Store](#adding-nutanix-object-store)
+
 ## Prerequisites
 - Download the Nutanix Kubernetes Platform (NKP) CLI/binary and Konvoy Image Builder (KIB) from Nutanix Portal [here](https://portal.nutanix.com/page/downloads?product=nkp). Choose your appropriate OS and the version.
 - A container engine of some kind i.e. Docker or Podman. Docker Desktop is usually not supported in some enterprises so you may need to use Podman, containerd, etc. In my case I used Rancher Desktop with `QEMU` emulation and `dockerd` for the container runtime engine on a arm64 MacOS machine.
@@ -57,7 +68,7 @@
 
 
 
-## Creating a NKP Cluster
+## Deploying an NKP Cluster
 - This is going to perform a simple installation with a bit less customization option through the ``nkp`` cli tool.
 - Export the following environment variables. Choose a cluster name of your choice and use your Prism Central credentials for `NUTANIX_USER` and `NUTANIX_PASSWORD`:
 ```sh
