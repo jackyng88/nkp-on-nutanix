@@ -121,6 +121,33 @@ nkp create cluster nutanix
 - When the cluster successfully deploys you should see the following messages.
 ![NKP Successful Deployment](./images/nkp-successful-deploy.png)
 
+- You may need to wait for Kommander to fully be ready and you can watch that with the following command:
+```sh
+kubectl -n kommander wait --for condition=Ready helmreleases --all --timeout 15m
+```
+
+- The logs will look like the following when ready:
+```
+helmrelease.helm.toolkit.fluxcd.io/cluster-observer-2360587938 condition met
+helmrelease.helm.toolkit.fluxcd.io/dex condition met
+helmrelease.helm.toolkit.fluxcd.io/dex-k8s-authenticator condition met
+helmrelease.helm.toolkit.fluxcd.io/gatekeeper condition met
+helmrelease.helm.toolkit.fluxcd.io/gatekeeper-proxy-mutations condition met
+helmrelease.helm.toolkit.fluxcd.io/gateway-api-crds condition met
+helmrelease.helm.toolkit.fluxcd.io/karma-traefik-certs condition met
+helmrelease.helm.toolkit.fluxcd.io/kommander condition met
+helmrelease.helm.toolkit.fluxcd.io/kommander-appmanagement condition met
+helmrelease.helm.toolkit.fluxcd.io/kommander-operator condition met
+helmrelease.helm.toolkit.fluxcd.io/kommander-ui condition met
+helmrelease.helm.toolkit.fluxcd.io/kube-oidc-proxy condition met
+helmrelease.helm.toolkit.fluxcd.io/kubefed condition met
+helmrelease.helm.toolkit.fluxcd.io/prometheus-traefik-certs condition met
+helmrelease.helm.toolkit.fluxcd.io/reloader condition met
+helmrelease.helm.toolkit.fluxcd.io/traefik condition met
+helmrelease.helm.toolkit.fluxcd.io/traefik-crds condition met
+helmrelease.helm.toolkit.fluxcd.io/traefik-forward-auth-mgmt condition met
+```
+
 - You can run a few ``kubectl`` commands to test connectivity such as:
 ```sh
 kubectl get pods
@@ -132,16 +159,254 @@ kubectl get kommander -n kommander
 export KUBECONFIG=$CLUSTER_NAME-cluster.conf
 ```
 
+
+
 - Now to test the web GUI url use the following command:
 ```sh
 nkp open dashboard --kubeconfig=${CLUSTER_NAME}.conf
 ```
+- Once that command is entered, the login page should automatically open in your browser with the following credentials displayed in shell:
+```sh
+Username: <generated-username>
+Password: <generated-password>
+URL: https://<ip-address>/dkp/kommander/dashboard
+```
+
+![Dex Login Page](./images/dex-login.png)
 
 
-## Troubleshooting some Errors
-- Timing out on deployment of core applications 
 
-![Core Application Timeout]
+## Adding Harbor Container Registry to the Cluster
+- By default NKP clusters do not have their own dedicated internal private registry. NKP with 2.14 now supports Harbor for their internal registry. The following are steps to deploy it into your NKP cluster.
+- Prerequisites:
+    - Deploy the Cloud Native Postgres (CloudNativePG) operator and then enabling the CloudNativePG application on the cluster. We will be deploying the CNPG operator through ``Helm`` as it is a good tool to have and use.
+    - Having access to an S3-compatible object store such as ``Nutanix Objects``, ``AWS S3``, or an integrated ``Rook Ceph``. For this scenario we will be using ``Nutanix Objects``.
+
+### Deploying CloudNativePG
+- We will now deploy the CNPG operator via Helm chart. The Helm charts are [here](https://github.com/cloudnative-pg/charts). Run the following command to add the Helm chart into your internal repo:
+```sh
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+```
+
+- The following command wll install the operator:
+```sh
+helm upgrade --install cnpg \
+  --namespace cnpg-system \
+  --create-namespace \
+  cnpg/cloudnative-pg
+```
+
+- You will see the following:
+```
+Release "cnpg" does not exist. Installing it now.
+NAME: cnpg
+LAST DEPLOYED: Fri Apr 11 11:13:51 2025
+NAMESPACE: cnpg-system
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CloudNativePG operator should be installed in namespace "cnpg-system".
+You can now create a PostgreSQL cluster with 3 nodes as follows:
+
+cat <<EOF | kubectl apply -f -
+# Example of PostgreSQL cluster
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+
+spec:
+  instances: 3
+  storage:
+    size: 1Gi
+EOF
+
+kubectl get -A cluster
+```
+
+- You can verify the resources that get created with the operator in the ``cnpg-system`` namespace via:
+```sh
+kubectl get all -n cnpg-system
+```
+
+- Next we'll deploy an actual CNPG database cluster:
+```sh
+helm upgrade --install cnpg-database \
+  --namespace database \
+  --create-namespace \
+  cnpg/cluster
+```
+
+- You will then see the following:
+![CNPG Installation](./images/cnpg-install.png)
+
+- You can see the created resources in the ``database`` namespace via:
+```sh
+kubectl get all -n database
+```
+
+- It will take awhile for everything to spin up and reconcile but you can watch the progression of the CNPG database cluster pods with the following command:
+```sh
+kubectl get pods -n database -w
+```
+
+- When everything is finished you should see three `Running` pods:
+```sh
+kubectl get pods -n database
+```
+- The output:
+```sh
+NAME                      READY   STATUS    RESTARTS   AGE
+cnpg-database-cluster-1   1/1     Running   0          4m22s
+cnpg-database-cluster-2   1/1     Running   0          2m31s
+cnpg-database-cluster-3   1/1     Running   0          65s
+```
+
+- For a sanity test on the database pods, exec into the exposed service:
+```sh
+kubectl -n databasase exec --stdin --tty services/cnpg-database-cluster-rw -- bash
+```
+
+- Within `bash` on the container run `psql:
+```sh
+postgres@cnpg-database-cluster-1:/$ psql
+psql (16.8 (Debian 16.8-1.pgdg110+1))
+Type "help" for help.
+```
+
+- And you can then test with a command like the following to see system tables:
+```psql
+\dt *.*
+```
+
+- Now quit the psql CLI
+```
+\q
+```
+
+- Exit the exec
+```sh
+exit
+```
+
+### Adding Nutanix Object Store
+- Navigate to `Prism Central` and in the top-left drop-down menu select `Objects` under `Unified Storage`
+![Prism Central Objects](./images/pc-objects.png)
+
+- Click the `Create Object Store` button and then `Confirm` on the `Create Object Stores: Prerequisites window.
+
+- In the following window supply the following details:
+    - `Object Store Name`: Give it a name that is easily identifiable
+    - `Domain`: It should automatically pull the domain name
+    - `Cluster`: Select the cluster to use
+    - `Worker Nodes`: By default, it's set to 3 but for this scenario we'll use `2` Worker Nodes.
+- Click `Next` and configure the following:
+    - `Storage Network`: Select your subnet where your CVMs ideally use IP addresses from
+    - `Object Store Internal IPs`: Provide two IP addressess that exist in the same subnet as your CVM and not being currently used
+    - `Public Network`: Select your subnet, can be similar to the one used for NKP cluster creation
+    - `Public Network Static IPs`: Select an IP address outside of the IPAM pool and unused.
+
+- The following is an example of final configuration:
+![Objects Final Config](./images/objects-final-config.png)
+
+- Wait for the Object Store validation checks to all pass. You will be unable to create your Object Store until that happens. Hit `Create Object Store` when the checks have all been validated.
+
+- In `Objects` go to `Access Keys` and click `Add People` to generate access keys for API usage.
+- Search for people or Add people not in a directory service. Lastly, generate the keys.
+- Click `Download Key` and save it to your local machine. The txt file will have the `Secret Key`. You will only be able to see the `Access Key` within the Objects UI. We will need both keys later for the `COSI Driver for Nutanix` application.
+
+
+
+
+### Enabling CloudNativePG with your Cluster
+- Ensure that you have NKP Ultimate license. If you do not go to the Nutanix Portal and request a NKP Ultimate license key and apply it to your NKP cluster.
+
+- In your NKP Web console in the top left click the drop down menu that says Global and select `Management Cluster Workspace`
+![NKP Management Cluster Workspace](./images/nkp-mgmt-ws.png)
+
+- On the left side of the menu click ``Applications``
+- Then filter the name for `CloudNativePG`.
+- Click the three dots on the `CloudNativePG` tile and click `Enable` and then `Enable` again.
+![CloudNativePG Tile](./images/cnpg-tile.png)
+
+- Next go back to the `Application Dashboard` and filter name by `COSI Driver` and click `Enable`
+![COSI Driver NTNX](./images/cosi-tile.png)
+
+- In `Enable Workspace Platform Application` box, fill out the following details:
+    - `Prism Central Endpoint`: Your Prism Central URL likely in the form of `https://<ip>:9440`
+    - `Prism Central Username`: Your Prism Central administrator username i.e. `admin`
+    - `Prism Central Password`: Your Prism Central administrator password
+    - `Nutanix Object Storage Endpoint`: The Public IP of your Object Store.
+    - `Nutanix Object Access Key`: Generated in the previous section
+    - `Nutanix Object Secret Key`: Generated in the previous section. In the downloaded `.txt` file.
+![COSI Driver](./images/cosi-driver.png)
+
+- Click `Enable`
+
+
+- Again, go back to the `Application Dashboard` and filter name by `Harbor`. Do the same as CPNG and Enable it.
+![Harbor Tile](./images/harbor-tile.png)
+
+- Under `S3 Object Store` click the drop-down and select `Nutanix Objects`. If you did not properly setup the `COSI Driver for Nutanix` application, this option will be greyed out.
+![Harbor Objects](./images/harbor-objects.png)
+
+- Click `Enable` to enable `Harbor`.
+
+- **NOTE**: You may need to enable more resources for your compute/worker nodes. You can do so by going to `Management Cluster` under your `Management Cluster Workspace` and then clicking `Nodepools`. 
+
+- Click the three dots for the `Worker` node with a `Node Count` of 4.
+![Edit Worker Node Resources](./images/worker-node-resources.png)
+
+- Bump up the resources as you see fit. In this example, I used 16 `vCPUs` and 48gb `Memory`.
+![Worker Node Edit](./images/worker-node-edit.png)
+- Click `Save` and wait for Prism Central to finish provisioning. Prism Central will provision new VMs one by one and then condemn the old VMs. Some functions may go down/not be accessible intermittently in the NKP cluster.
+
+- Run the following to find the address of the Harbor container registry:
+```sh
+echo "https://$(kubectl -n kommander get kommandercluster host-cluster -o jsonpath='{.status.ingress.address}'):5000"
+```
+
+- Now to grab the password of Harbor:
+```sh
+kubectl get secrets -n ncr-system harbor-admin-password -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d
+```
+
+- What the above command does is data is converted to base64 encoding when placed in the `data` field of a Kubernetes secret. It will be plain text if placed in `stringData`. The output will look something like: 
+```
+?VFo0YFKfLSYYWDllTqt
+```
+
+- Enter the Harbor Registry URL and input the following values:
+    - `Username`: `admin`
+    - `Password`: The output of the base64 decoded password above.
+
+![Harbor Login](./images/harbor-login.png)
+
+- 
+
+
+
+
+
+- Wait for `Nutanix Objects` to finish creating your Object store
+![Nutanix Objects Creating](./images/objects-creating.png)
+
+
+
+
+
+
+
+
+
+
+
+
+## Adding Okta as Identity Provider to the Cluster
+
+## Troubleshooting Errors
+
 
 
 
