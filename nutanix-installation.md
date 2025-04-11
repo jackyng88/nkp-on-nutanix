@@ -308,7 +308,9 @@ exit
     - `Public Network Static IPs`: Select an IP address outside of the IPAM pool and unused.
 
 - The following is an example of final configuration:
+
 ![Objects Final Config](./images/objects-final-config.png)
+
 
 - Wait for the Object Store validation checks to all pass. You will be unable to create your Object Store until that happens. Hit `Create Object Store` when the checks have all been validated.
 
@@ -374,7 +376,7 @@ kubectl get secrets -n ncr-system harbor-admin-password -o jsonpath='{.data.HARB
 
 - What the above command does is data is converted to base64 encoding when placed in the `data` field of a Kubernetes secret. It will be plain text if placed in `stringData`. The output will look something like: 
 ```
-?VFo0YFKfLSYYWDllTqt
+?YmxhaCBibGFoCg==
 ```
 
 - Enter the Harbor Registry URL and input the following values:
