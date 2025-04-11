@@ -50,6 +50,11 @@
 - We will add a Rocky Linux 9.5 image that was downloaded from the portal [here](https://portal.nutanix.com/page/downloads?product=nkp&a=9728ece46a91ccd8e14f9482b8693e927c28d3f08649b668180f06007cc059dbd062f5f7bdd998b8)
 - Under ``Infrastructure`` click the ``Compute`` drop-down and then ``Images``.
 - Click ``Add Image`` and then add the Rocky Linux 9.5 image that was just downloaded.
+![NKP Image Select](./images/nkp-image-select.png)
+
+- Choose a location for your image, for simplicity choose ``Place image directly on clusters``
+![NKP Image Location](./images/nkp-image-location.png)
+
 
 
 ## Creating a NKP Cluster
@@ -64,6 +69,10 @@ export NUTANIX_PASSWORD=<password>
 ```sh
 nkp create cluster nutanix
 ```
+- The interactive CLI tool will look like the following:
+![NKP Interactive](./images/nkp-interactive.png)
+
+
 - Using the CLI tool fill out the following instructions, following the key commands to navigate the tool.
 - Fields to fill:
     - ``Prism Central Endpoint``: Use your Prism Central endpoint with IP or FQDN appended with :9440
@@ -74,7 +83,7 @@ nkp create cluster nutanix
     - ``Prism Element Cluster``: Select from a fetched list of Prism Element clusters.
     - ``Subnet``: Select from a fetched list of subnets. Select the one we created earlier in the [Setting up a Subnet in Prism Central](#setting-up--subnet-in-prism-central) section.
     - ``Cluster Name``: If you exported the ``CLUSTER_NAME`` env variable earlier it will be populated here. Otherwise you can fill it in now.
-    - ``Control Plane Endpoint``: Choose an unused IP address from your created ``Subnet``. If you do not know which ones are currently used go to Prism Central > ``Infrastructure`` > `` Network & Security`` > ``Subnets`` > ``Network Config`` button. Now next to your created subnet click on ``Used IP Addresses`` and you will see the currently used IP Addresses in this subnet. Pick an IP address not present here and one that does not fall under the IP Address Pool. 
+    - ``Control Plane Endpoint``: Choose an unused IP address from your created ``Subnet``. If you do not know which ones are currently used go to Prism Central > ``Infrastructure`` > `` Network & Security`` > ``Subnets`` > ``Network Config`` button. Now next to your created subnet click on ``Used IP Addresses`` and you will see the currently used IP Addresses in this subnet. Pick an IP address not present here and one that does not fall under the IPAM range as well in the ``Service Load Balancer IP Range`` a bit further.
     - ``VM Image``: A fetched list of *compatible* VM images should show up i.e. the Rocky Linux image we uploaded.
 
 - Now under the ``Kubernetes Network`` section:
@@ -88,14 +97,51 @@ nkp create cluster nutanix
     - ``Hypervisor Attached Volumes``: Select ``Yes``.
     - ``Storage Container``: Select the name of your created Storage Container from the section [Creating a Storage Container in Prism Central](#creating-a-storage-container-in-prism-central) that is fetched.
 
-- We are now at the ``Additional Configuration (optional)`` section. Here you can fill in the details as necessary for use within the cluster, we will use the defaults in this scenario.
+- We are now at the ``Additional Configuration (optional)`` section. Here you can fill in the details as necessary for use within the cluster, we will mostly use defaults here besides the following:
+    - The kubelet on the Kubernetes cluster may fail to pull images due to an un-authenticated pull rate limit. To overcome that you should provide DockerHub credentials. A personal/free account should be enough.
+    - Under the ``Registry`` section:
+        - For ``Registry URL`` use ``https://registry-1.docker.io``
+        - Leave ``Registry CA Certificate`` blank
+        - For ``Registry Username`` type in your DockerHub username
+        - For ``Registry Password`` you can either use your DockerHub password or a generated personal access token which is advised.
 
-- Finally during the ``Create NKP Cluster?:`` prompt, we will select ``Create`` and hit Enter.
+- Finally during the ``Create NKP Cluster?:`` prompt, we will select ``Create`` and hit Enter. The final config will look similar to the following image:
 
-- We will not wait for the NKP CLI to create a bootstrap cluster which will then create the actual NKP cluster.
+![NKP Final Config](./images/nkp-final-config.png)
+
+- We will now wait for the NKP CLI to create a bootstrap cluster which will then create the actual NKP cluster.
+    - If you want to follow progress of creation of some resources via Prism Central UI you will initially see one VM for the bootstrap node and then 7 nodes in total for the self-managed standup (3 control plane nodes and 4 worker nodes).
+
+    ![nodes](./images/nodes.png)
+
+- Eventually when the cluster infrastructure, control-plane, machines, CAPI components, ClusterClass resources are ready, NKP will destroy the bootstrap cluster and create a kubeconfig file. 
+
+![New Kubeconfig file](./images/kubeconfig-file.png)
+
+- When the cluster successfully deploys you should see the following messages.
+![NKP Successful Deployment](./images/nkp-successful-deploy.png)
+
+- You can run a few ``kubectl`` commands to test connectivity such as:
+```sh
+kubectl get pods
+kubectl get nodes
+kubectl get kommander -n kommander
+```
+- If the above commands don't work and you a connectivity/API server connection error you will need to set your ``KUBECONFIG`` env variable to the newly created ``$CLUSTER_NAME-cluster.conf`` file in the current working directory.
+```sh
+export KUBECONFIG=$CLUSTER_NAME-cluster.conf
+```
+
+- Now to test the web GUI url use the following command:
+```sh
+nkp open dashboard --kubeconfig=${CLUSTER_NAME}.conf
+```
 
 
+## Troubleshooting some Errors
+- Timing out on deployment of core applications 
 
+![Core Application Timeout]
 
 
 
