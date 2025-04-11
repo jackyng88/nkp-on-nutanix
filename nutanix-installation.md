@@ -314,6 +314,10 @@ exit
 
 - Wait for the Object Store validation checks to all pass. You will be unable to create your Object Store until that happens. Hit `Create Object Store` when the checks have all been validated.
 
+- Wait for `Nutanix Objects` to finish creating your Object store
+![Nutanix Objects Creating](./images/objects-creating.png)
+
+
 - In `Objects` go to `Access Keys` and click `Add People` to generate access keys for API usage.
 - Search for people or Add people not in a directory service. Lastly, generate the keys.
 - Click `Download Key` and save it to your local machine. The txt file will have the `Secret Key`. You will only be able to see the `Access Key` within the Objects UI. We will need both keys later for the `COSI Driver for Nutanix` application.
@@ -385,14 +389,6 @@ kubectl get secrets -n ncr-system harbor-admin-password -o jsonpath='{.data.HARB
 
 ![Harbor Login](./images/harbor-login.png)
 
-- 
-
-
-
-
-
-- Wait for `Nutanix Objects` to finish creating your Object store
-![Nutanix Objects Creating](./images/objects-creating.png)
 
 
 
