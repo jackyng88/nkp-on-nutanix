@@ -206,7 +206,6 @@ nkp create cluster nutanix \
 
 You may notice that there are no flags for `NUTANIX_USER` and `NUTANIX_PASSWORD` - the nkp cli natively reads from those environment variables.
 
-Look to the end of the next section in Interactive Deployment for an idea of what a successful deployment looks like. 
 
 **Note**: This 1 control plane and 1 worker node configuration is only for kicking the tires on a simple test/lab deployment to have a cluster up and running. Following is a table that shows the delta in a 1 + 1 setup vs a 3 + 4 setup:
 
@@ -223,6 +222,73 @@ Look to the end of the next section in Interactive Deployment for an idea of wha
 | Dex / OIDC authentication | ⚠️ Runs but no replica redundancy, outage on restart | ✅ |
 | Gatekeeper policy enforcement | ⚠️ Webhook may block pod scheduling if pod is unavailable | ✅ |
 | Harbor (if enabled) | ❌ Insufficient resources to schedule all required pods | ✅ |
+
+Example of successful deployment:
+
+```sh
+ ✓ Pulling bootstrap image
+ ✓ Creating a bootstrap cluster
+ ✓ Initializing new CAPI components
+ ✓ Initializing new CAPI components
+ ✓ Creating ClusterClass resources
+ ✓ Creating ClusterClass resources
+ ✓ Generating cluster configuration (Kubernetes resources)
+secret/jn-test-pc-credentials created
+secret/jn-test-pc-credentials-for-csi created
+secret/jn-test-pc-credentials-for-konnector-agent created
+secret/global-nutanix-credentials created
+Cluster refers to ClusterClass default/nkp-nutanix-v2.17.1, but this ClusterClass hasn't been successfully reconciled. Cluster topology has not been fully validated. Please take a look at the ClusterClass status
+cluster.cluster.x-k8s.io/jn-test created
+configmap/kommander-bootstrap-configuration created
+ ✓ Running preflight checks
+⢄⡱ Creating metadata objects secret/prism-central-metadata created
+ ✓ Creating metadata objects
+ ✓ Creating cluster
+ ✓ Waiting for cluster infrastructure to be ready
+ ✓ Waiting for cluster control-planes to be ready
+ ✓ Waiting for machines to be ready
+ ✓ Initializing new CAPI components
+ ✓ Initializing new CAPI components
+ ✓ Creating ClusterClass resources
+ ✓ Moving cluster resources
+
+You can now view resources in the moved cluster by using the --kubeconfig flag with kubectl.
+For example: kubectl --kubeconfig="/Users/jacky.ng/Learning/nkp/documentation/jn-test.conf" get nodes
+
+ ✓ Deleting bootstrap cluster
+
+Cluster default/jn-test kubeconfig was written to to the filesystem.
+You can now view resources in the new cluster by using the --kubeconfig flag with kubectl.
+For example: kubectl --kubeconfig="/Users/jacky.ng/Learning/nkp/documentation/jn-test.conf" get nodes
+
+Starting Kommander installation
+ ✓ Deploying Flux
+ ✓ Deploying Ingress certificate
+ ✓ Creating kommander-overrides ConfigMap
+ ✓ Deploying Git Operator
+ ✓ Creating GitClaim for management GitRepository
+ ✓ Creating GitClaimUser for accessing management GitRepository
+ ✓ Deploying Flux configuration
+ ✓ Deploying Kommander Operator
+ ✓ Creating KommanderCore resource
+ ✓ Cleaning up Kommander bootstrap resources
+ ✓ Deploying Gatekeeper
+ ✓ Creating PlatformVersionArtifact
+ ✓ Deploying Kommander AppManagement
+ ✓ 4 out of 14 core applications have been installed (waiting for dex, dex-k8s-authenticator and 8 more)
+ ✓ 5 out of 14 core applications have been installed (waiting for dex, dex-k8s-authenticator and 7 more)
+ ✓ 10 out of 14 core applications have been installed (waiting for dex-k8s-authenticator, kommander and 2 more)
+ ✓ 12 out of 14 core applications have been installed (waiting for dex-k8s-authenticator, traefik-forward-auth-mgmt)
+ ✓ 11 out of 14 core applications have been installed (waiting for dex, dex-k8s-authenticator and 1 more)
+ ✓ 13 out of 14 core applications have been installed (waiting for traefik-forward-auth-mgmt)
+
+Cluster was created successfully! Get the dashboard details with:
+nkp get dashboard --kubeconfig="/Users/jacky.ng/Learning/nkp/documentation/jn-test.conf"
+```
+
+![Prism Small Lab](./images/small-lab-deploy.png)
+
+
 
 ### Interactive Deployment
 
