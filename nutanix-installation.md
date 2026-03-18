@@ -1,6 +1,6 @@
-# Simple NKP Installation Guide on a Nutanix Cluster 
+# Simple NKP Installation Guide on a Nutanix Cluster
 
-- This is a simple installation guide for Nutanix Kubernetes Platform v2.14 on simple AHV VMs and usiing a Linux/MacOS machine.
+- This is a simple installation guide for Nutanix Kubernetes Platform v2.17 on simple AHV VMs and using a Linux/MacOS machine.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -14,22 +14,28 @@
     - [Adding Nutanix Object Store](#adding-nutanix-object-store)
 
 ## Prerequisites
-- Download the Nutanix Kubernetes Platform (NKP) CLI/binary and Konvoy Image Builder (KIB) from Nutanix Portal [here](https://portal.nutanix.com/page/downloads?product=nkp). Choose your appropriate OS and the version.
+- Download the Nutanix Kubernetes Platform (NKP) CLI/binary and Konvoy Image Builder (KIB) from Nutanix Portal [here](https://portal.nutanix.com/page/downloads?product=nkp). Choose your appropriate OS and the version. **Note**: Make sure that the appropriate Linux OS image maps to the NKP CLI version.
 - A container engine of some kind i.e. Docker or Podman. Docker Desktop is usually not supported in some enterprises so you may need to use Podman, containerd, etc. In my case I used Rancher Desktop with `QEMU` emulation and `dockerd` for the container runtime engine on a arm64 MacOS machine.
-- A container registry for your environment
+  - The container runtime engine (CRE) will allow your laptop to serve as a bastion host to deploy a KinD (Kubernetes in Docker) cluster to serve as the bootstrap cluster.
+  - For ease of use depending on your environment - add the nkp/docker (or related CLI binaries) to your PATH environment variable instead of having to use the entire working directory to those binaries.
+- (Optional) A container registry for your environment 
+  - For air-gapped deployments your bastion host will need to push the air gapped bundles into an external container registry like Harbor.
 - A valid Nutanix account
 - A properly configured Prism Central with administrator access with the following credentials
     - Managing the cluster i.e. listing subnets, creating VMs in Prism Central
     - Managing persistent storage used by the Nutanix Container Storage Interface (CSI) provider.
     - Discovering node metadata used by Nutanix Cloud Cost Management (CCM) provider.
-- A subnet with unused IP addresses (this example has 9 unused)
+- A subnet with unused IP addresses (this deployment example has 9 unused)
     - One IP address for each node in the Kubernetes cluster. 
-    - Default cluster size has *three* control plane nodes and *four* worker nodes for a total of *seven*
+      - Default cluster size has *three* control plane nodes and *four* worker nodes for a total of *seven* IP addresses.
     - *One* IP address for the control plane endpoint Virtual IP
-    - *One* IP address for the NKP LoadBalancer serice Virtual IP
+    - *One* IP address for the NKP LoadBalancer service Virtual IP for MetalLB.
 - Since we will be standing up a self-managed NKP cluster i.e. a cluster that isn't for managing another cluster you will need to unset your ``KUBECONFIG`` environment variable and make sure ``~/.kube/config`` doesn't exist. Copy the current config file to somewhere else for use later.
+  - This is for purposes of administrating your Kubernetes cluster via `kubectl`. By default without providing the `--kubeconfig=/path/to/kubeconfig`, any `kubectl` command will look to the `KUBECONFIG` environment variable to be set to the path.
 
 ## Setting up a Subnet in Prism Central
+- *Note*: Ideally you have a subnet with DHCP/Nutanix IPAM enabled with a IP pool. These are used to provision NKP Node VMs. 
+  - You can deploy baremetal/pre-provisioned VMs using static IPs but typically that is not advised.
 - In Prism Central, under Infrastructure at the top drop down, select ``Network & Security``
 - Then click ``Subnets``
 - Click ``Create Subnet``
@@ -37,7 +43,7 @@
     - Enter a name for the Subnet under ``Name``
     - For ``Type`` select VLAN
     - Select the appropriate ``Cluster``
-    - Under ``IP Address Management`` and then ``IP Assignemnt Service`` select ``Nutanix IPAM``
+    - Under ``IP Address Management`` and then ``IP Assignment Service`` select ``Nutanix IPAM``
     - Under ``Network IP Address / Prefix`` make sure that you give it a proper CIDR notation network address.
     - Under ``IP Pools`` provide a range from ``Start Address`` to ``End Address``. Make sure this range falls under IP addresses available in the subnet.
     - Provide a ``Gateway IP Address`` that adheres to the previously given Network IP Address
@@ -46,21 +52,23 @@
 ## Creating a Storage Container in Prism Central
 - We will need a Storage Container for usage with NKP and the necessary storage drivers provisioning storage.
 - In Prism Central under ``Infrastructure``, select ``Storage`` and then ``Storage Containers``.
+- For capacity of the Storage container - it depends on your workload needs but typically ~80 gb for each node and around ~120 gb for the NKP services.
 - Fill in the details and advanced configuration settings as needed. In this scenario, we will leave everything default.
 
 
 ## Configuring Prism Central Authorization Policy and Role
 - In Prism Central, go to ``Admin Center`` and click ``IAM``
 - Click ``Identities`` and then ``Add Local User``. Fill it out with the appropriate details.
-- Now go to ``Authorization Policies`` and click ``Create Authorization Policy``. Fill out the Policy and assign it the proper ``Role`` with the necessary credentials outlined [here](https://portal.nutanix.com/page/documents/details?targetId=Nutanix-Kubernetes-Platform-v2_14%3Atop-prism-central-role-permissions-r.html&a=9728ece46a91ccd8e14f9482b8693e927c28d3f08649b668180f06007cc059dbd062f5f7bdd998b8)
+- Now go to ``Authorization Policies`` and click ``Create Authorization Policy``. Fill out the Policy and assign it the proper ``Role`` with the necessary credentials outlined [here](https://portal.nutanix.com/page/documents/details?targetId=Nutanix-Kubernetes-Platform-v2_17%3Atop-prism-central-role-permissions-r.html)
 
 
 ## Adding a Base Image for use with NKP
-- In Prism Centraln we need to add an Image for use with the Nutanix Kubernetes Platform Image Builder (NIB) in order to create a custom image.
+- In Prism Central we will add the necessary OS image.
 - In this example we will be assuming a NKP Starter License tier so we will need to use the pre-built image that was downloaded along with the NKP binary file.
-- We will add a Rocky Linux 9.5 image that was downloaded from the portal [here](https://portal.nutanix.com/page/downloads?product=nkp&a=9728ece46a91ccd8e14f9482b8693e927c28d3f08649b668180f06007cc059dbd062f5f7bdd998b8)
+  - In higher NKP tiers (Pro, Ultimate) you will be able to use other OS images as well as custom KIB-built images.
+- We will add a Rocky Linux 9.6 image that was downloaded from the portal [here](https://portal.nutanix.com/page/downloads?product=nkp)
 - Under ``Infrastructure`` click the ``Compute`` drop-down and then ``Images``.
-- Click ``Add Image`` and then add the Rocky Linux 9.5 image that was just downloaded.
+- Click ``Add Image`` and then add the Rocky Linux 9.6 image that was just downloaded.
 ![NKP Image Select](./images/nkp-image-select.png)
 
 - Choose a location for your image, for simplicity choose ``Place image directly on clusters``
@@ -69,13 +77,8 @@
 
 
 ## Deploying an NKP Cluster
-- This is going to perform a simple installation with a bit less customization option through the ``nkp`` cli tool.
-- Export the following environment variables. Choose a cluster name of your choice and use your Prism Central credentials for `NUTANIX_USER` and `NUTANIX_PASSWORD`:
-```sh
-export CLUSTER_NAME=<name-of-nutanux-cluster>
-export NUTANIX_USER=<username>
-export NUTANIX_PASSWORD=<password>
-```
+- This is going to perform a simple installation with a bit less customization option through the ``nkp`` cli tool. This utilize an interactive shell window.
+- To operationalize this deployment with the `nkp` cli you will need to utilize flags to the `nkp` command - especially in scripts or GitOps configurations - but for the purposes of a quick lab/demo the shell command is fine. It will default a 3 control plane/4 worker plane cluster.
 - In your terminal/shell run the following command:
 ```sh
 nkp create cluster nutanix
@@ -92,19 +95,22 @@ nkp create cluster nutanix
     - ``Insecure``: Select ``No`` if you require a certificate to connect to PC. ``Yes`` if you do not. 
     - ``Project``: The NKP CLI tool will fetch a project to choose from.
     - ``Prism Element Cluster``: Select from a fetched list of Prism Element clusters.
-    - ``Subnet``: Select from a fetched list of subnets. Select the one we created earlier in the [Setting up a Subnet in Prism Central](#setting-up--subnet-in-prism-central) section.
-    - ``Cluster Name``: If you exported the ``CLUSTER_NAME`` env variable earlier it will be populated here. Otherwise you can fill it in now.
-    - ``Control Plane Endpoint``: Choose an unused IP address from your created ``Subnet``. If you do not know which ones are currently used go to Prism Central > ``Infrastructure`` > `` Network & Security`` > ``Subnets`` > ``Network Config`` button. Now next to your created subnet click on ``Used IP Addresses`` and you will see the currently used IP Addresses in this subnet. Pick an IP address not present here and one that does not fall under the IPAM range as well in the ``Service Load Balancer IP Range`` a bit further.
+    - ``Subnet``: Select from a fetched list of subnets. Select the one we created earlier in the [Setting up a Subnet in Prism Central](#setting-up-a-subnet-in-prism-central) section.
+    - ``Cluster Name``: Fill it in with a name of your choosing.
+    - ``Control Plane Endpoint``: Choose an unused IP address from your ``Subnet``. If you do not know which ones are currently used go to Prism Element > Settings Icon in the top right > `` Network Configuration`` > `Unused IP Addresses` link. Now next to your created subnet click on ``Used IP Addresses`` and you will see the currently used IP Addresses in this subnet. 
+      - **NOTE**: Pick an IP address currently not used and one that does not fall under the DHCP/IPAM range as well in the ``Service Load Balancer IP Range`` a bit further.
     - ``VM Image``: A fetched list of *compatible* VM images should show up i.e. the Rocky Linux image we uploaded.
 
 - Now under the ``Kubernetes Network`` section:
-    - ``Service Load Balancer IP Range``: Supply a range for the Load Balancer IP in a range of the format ``x.x.x.x-y.y.y.y``. Make sure that this range falls under your subnet.
-    - ``Pod Network``: Can be left as default i.e. ``192.168.0.0/16``. This is the IP internally to the Kubernetes cluster isolated by Pod. You can think of this as the Pod having it's own network and the internal containers within each Pod having each their own unique IP address. So container A within Pod A can have an IP address of say ``192.168.0.3`` as well as Container B within Pod B with the same IP Address.
+    - ``Service Load Balancer IP Range``: Supply a range for the Load Balancer IP in a range of the format ``x.x.x.x-y.y.y.y``. 
+      - **Note**: Similar to the control plane endpoint VIP, make sure that this range falls under your subnet and outside of your DHCP IP pool.
+    - ``Pod Network``: Can be left as default i.e. ``192.168.0.0/16``. This is the IP internally to the Kubernetes cluster isolated by Pod. You can think of this as the Pod having its own network and the internal containers within each Pod having each their own unique IP address. So container A within Pod A can have an IP address of say ``192.168.0.3`` as well as Container B within Pod B with the same IP Address.
     - ``Service Network``: Can be left as default i.e. ``10.96.0.0/12``. Created services within the Kubernetes service will have a VIP or ClusterIP in this address range.
 
 - Under the ``Storage`` section:
-    - ``Reclaim Policy``: The behavior in which when a user deletes a Persistent Volume Claim (PVC) whether the Kubernetes cluster will ``Retain`` or ``Delete`` the associated Persistent Volume (PV) dynamically created by a Storage Class (SC). If your application might have sensitive or important data you may use Retain. For this example we will use ``Delete``.
-    - ``File System``:  For a simple usecase here, choose ``ext4`` for general use as XFS is typically better with large files.
+    - ``Reclaim Policy``: The behavior in which when a user deletes a Persistent Volume Claim (PVC) whether the Kubernetes cluster will ``Retain`` or ``Delete`` the associated Nutanix vDisk in the event of a PVC deletion. If your application might have sensitive or important data you may use Retain. For this example we will use ``Delete``.
+      - Generally you would use `Delete` on workload clusters and `Retain` on management clusters where you have platform data (Prometheus, Loki, Grafana, etc.)
+    - ``File System``:  For a simple use case here, choose ``ext4`` for general use as XFS is typically better with large files and when you need high-throughput sequential I/O i.e. Kafka.
     - ``Hypervisor Attached Volumes``: Select ``Yes``.
     - ``Storage Container``: Select the name of your created Storage Container from the section [Creating a Storage Container in Prism Central](#creating-a-storage-container-in-prism-central) that is fetched.
 
@@ -165,7 +171,7 @@ kubectl get pods
 kubectl get nodes
 kubectl get kommander -n kommander
 ```
-- If the above commands don't work and you a connectivity/API server connection error you will need to set your ``KUBECONFIG`` env variable to the newly created ``$CLUSTER_NAME-cluster.conf`` file in the current working directory.
+- If the above commands don't work and you get a connectivity/API server connection error you will need to set your ``KUBECONFIG`` env variable to the newly created ``$CLUSTER_NAME-cluster.conf`` file in the current working directory.
 ```sh
 export KUBECONFIG=$CLUSTER_NAME-cluster.conf
 ```
@@ -174,7 +180,7 @@ export KUBECONFIG=$CLUSTER_NAME-cluster.conf
 
 - Now to test the web GUI url use the following command:
 ```sh
-nkp open dashboard --kubeconfig=${CLUSTER_NAME}.conf
+nkp open dashboard --kubeconfig=${CLUSTER_NAME}-cluster.conf
 ```
 - Once that command is entered, the login page should automatically open in your browser with the following credentials displayed in shell:
 ```sh
@@ -188,7 +194,7 @@ URL: https://<ip-address>/dkp/kommander/dashboard
 
 
 ## Adding Harbor Container Registry to the Cluster
-- By default NKP clusters do not have their own dedicated internal private registry. NKP with 2.14 now supports Harbor for their internal registry. The following are steps to deploy it into your NKP cluster.
+- By default NKP clusters do not have their own dedicated internal private registry. NKP with 2.17 now supports Harbor for their internal registry. The following are steps to deploy it into your NKP cluster.
 - Prerequisites:
     - Deploy the Cloud Native Postgres (CloudNativePG) operator and then enabling the CloudNativePG application on the cluster. We will be deploying the CNPG operator through ``Helm`` as it is a good tool to have and use.
     - Having access to an S3-compatible object store such as ``Nutanix Objects``, ``AWS S3``, or an integrated ``Rook Ceph``. For this scenario we will be using ``Nutanix Objects``.
@@ -199,7 +205,7 @@ URL: https://<ip-address>/dkp/kommander/dashboard
 helm repo add cnpg https://cloudnative-pg.github.io/charts
 ```
 
-- The following command wll install the operator:
+- The following command will install the operator:
 ```sh
 helm upgrade --install cnpg \
   --namespace cnpg-system \
@@ -276,10 +282,10 @@ cnpg-database-cluster-3   1/1     Running   0          65s
 
 - For a sanity test on the database pods, exec into the exposed service:
 ```sh
-kubectl -n databasase exec --stdin --tty services/cnpg-database-cluster-rw -- bash
+kubectl -n database exec --stdin --tty services/cnpg-database-cluster-rw -- bash
 ```
 
-- Within `bash` on the container run `psql:
+- Within `bash` on the container run `psql`:
 ```sh
 postgres@cnpg-database-cluster-1:/$ psql
 psql (16.8 (Debian 16.8-1.pgdg110+1))
@@ -305,7 +311,7 @@ exit
 - Navigate to `Prism Central` and in the top-left drop-down menu select `Objects` under `Unified Storage`
 ![Prism Central Objects](./images/pc-objects.png)
 
-- Click the `Create Object Store` button and then `Confirm` on the `Create Object Stores: Prerequisites window.
+- Click the `Create Object Store` button and then `Confirm` on the `Create Object Stores: Prerequisites` window.
 
 - In the following window supply the following details:
     - `Object Store Name`: Give it a name that is easily identifiable
@@ -314,7 +320,7 @@ exit
     - `Worker Nodes`: By default, it's set to 3 but for this scenario we'll use `2` Worker Nodes.
 - Click `Next` and configure the following:
     - `Storage Network`: Select your subnet where your CVMs ideally use IP addresses from
-    - `Object Store Internal IPs`: Provide two IP addressess that exist in the same subnet as your CVM and not being currently used
+    - `Object Store Internal IPs`: Provide two IP addresses that exist in the same subnet as your CVM and not being currently used
     - `Public Network`: Select your subnet, can be similar to the one used for NKP cluster creation
     - `Public Network Static IPs`: Select an IP address outside of the IPAM pool and unused.
 
@@ -362,7 +368,7 @@ exit
 - Click `Enable`
 
 
-- Again, go back to the `Application Dashboard` and filter name by `Harbor`. Do the same as CPNG and Enable it.
+- Again, go back to the `Application Dashboard` and filter name by `Harbor`. Do the same as CNPG and Enable it.
 ![Harbor Tile](./images/harbor-tile.png)
 
 - Under `S3 Object Store` click the drop-down and select `Nutanix Objects`. If you did not properly setup the `COSI Driver for Nutanix` application, this option will be greyed out.
@@ -402,21 +408,192 @@ kubectl get secrets -n ncr-system harbor-admin-password -o jsonpath='{.data.HARB
 
 
 
+## Using Harbor as the Cluster's Pull Through Cache
+- **Context:** Typically without any configuration Harbor will just act as an image/object registry for you to push/pull from manually. We're going to configure Harbor to be used as a pull through cache. What this means is that Harbor will serve as a proxy and save images internally as well as be used for internal Kubernetes image builds. For example, Harbor will proxy an image pull request to Docker Hub, store it in its registry and then when you spin up a Pod or Deployment, the image will first be pulled from Harbor instead.
+- First, we will create a custom user in Harbor. Typically these can be users like machine accounts (just for image pulling) or human accounts (access to UI) to perform specific tasks and given access policies.
+    - In the Harbor UI, login with your credentials received at the end of the previous section.
+    - Select `Administration` > `Users` and then the `NEW USER` button.
+
+
+- In the Harbor UI, under `Administration` click `Registries` and then click the `New Endpoint` button. Fill out the following details in the form:
+    - `Provider`: Select `Docker Hub` from the drop-down.
+    - `Name`: Give the endpoint a name
+    - `Description`: Optionally give it a description
+    - `Endpoint URL`: Since Docker Hub was selected for Provider, the endpoint should default to `https://hub.docker.com`
+    - `Access ID`: Use your Docker Hub credentials, you can use the same one as the one used during NKP deployment to bypass the rate limits.
+    - `Access Secret`: Same as Access ID, use your secret.
+    - `Verify Remote Cert`: Uncheck this.
+
+- You can test the connection with the `Test Connection` button.
+![Harbor Registry Config](./images/harbor-config.png)
+
+- Hit `OK` to create.
+
+
+- Now go to `Projects`
+- Delete the default `library` project.
+![Project Delete Library](./images/project-library-delete.png)
+
+- We will now recreate that project. Click `NEW PROJECT` and fill in the following:
+    - `Project Name`: Input `library` here
+    - `Access Level`: Make sure this is unchecked for Public
+    - `Project quota limits`: Leave at `-1` for unlimited here
+    - `Proxy Cache`: Enable this and from the drop-down select the created Docker Hub registry we just created.
+        - `Endpoint`: `https://hub.docker.com` should have been prepopulated by selecting the previous Docker Hub registry.
+    - `Bandwidth`: Leave this at `-1`
+
+![Project New](./images/project-library-new.png)
+
+- Click `OK` to create the project.
+
+- Once the `library` project has been created. Click that project and then select `Robot Accounts` and then the `NEW ROBOT ACCOUNT` button.
+![Harbor Robot Account](./images/harbor-robot-account.png)
+
+- Here fill out a name for the robot account. Set the duration of the robot account to `Never`. Hit `Next`.
+- Under `Permissions` for ease of use (for now) click `Select All` and then `Finish`.
+- In the subsequent screen will be the name of the Robot Account and secret. Make sure to write the credentials down/export to file.
+
+
+## Installing Kyverno for use with Harbor as a Pull-through Cache
+- **Context**: Normally if you wanted to use Harbor as an internal registry to cache your images you would need to either manually add the Harbor URL to all the Pod/Deployment definitions or manually update all the Kubernetes `daemon.json` with the Harbor registry and then restarting all their container runtime engine daemons. To circumvent having to do this we'll use a tool named `Kyverno` to enforce policies to use Harbor. In this example we'll use match and mutate policies.
+- For more information about Kyverno visit [here](https://kyverno.io/docs/introduction/how-kyverno-works/)
+- For a quick install for Kyverno run the following command:
+```sh
+kubectl create -f https://github.com/kyverno/kyverno/releases/download/v1.13.0/install.yaml
+```
+- Wait for all the resources to be created/deployed.
+- Next create a new yaml file named `replace-image-registry-with-harbor.yaml` or the file in this repo [here](./artifacts/replace-image-registry-with-harbor.yaml)
+- **NOTE**: Replace `<YOUR_HARBOR_URL>` in the file below with the Harbor URL retrieved from the earlier step (e.g. `10.54.114.152:5000`).
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: replace-image-registry-with-harbor
+  annotations:
+    policies.kyverno.io/title: Replace Image Registry With Harbor
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/category: Sample
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    kyverno.io/kyverno-version: 1.11.4
+    kyverno.io/kubernetes-version: "1.27"
+    policies.kyverno.io/description: >-
+      Some registries like Harbor offer pull-through caches for images from certain registries.
+      Images can be re-written to be pulled from the redirected registry instead of the original and
+      the registry will proxy pull the image, adding it to its internal cache.
+      The imageData context variable in this policy provides a normalized view
+      of the container image, allowing the policy to make decisions based on various 
+      "live" image details. As a result, it requires access to the source registry and the existence
+      of the target image to verify those details.      
+spec:
+  rules:
+    - name: redirect-docker
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              operations:
+                - CREATE
+                - UPDATE
+      mutate:
+        foreach:
+          - list: request.object.spec.initContainers[]
+            context:
+              - name: imageData
+                imageRegistry:
+                  reference: "{{ element.image }}"
+            preconditions:
+              any:
+                - key: "{{imageData.registry}}"
+                  operator: Equals
+                  value: index.docker.io
+            patchStrategicMerge:
+              spec:
+                initContainers:
+                  - name: "{{ element.name }}"
+                    image: https://<YOUR_HARBOR_URL>/library/{{imageData.repository}}:{{imageData.identifier}}
+          - list: request.object.spec.containers[]
+            context:
+              - name: imageData
+                imageRegistry:
+                  reference: "{{ element.image }}"
+            preconditions:
+              any:
+                - key: "{{imageData.registry}}"
+                  operator: Equals
+                  value: index.docker.io
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    image: https://<YOUR_HARBOR_URL>/library/{{imageData.repository}}:{{imageData.identifier}}
+```
+
+
+- Now that we have Harbor setup we will need to setup the NKP cluster. First, we will need to create the Kubernetes credential for purposes of authenticating with Harbor. Run the following command replace the necessary values, replacing the `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` values with the robot account ones:
+```sh
+export REGISTRY_USERNAME=<your-robot-username>
+export REGISTRY_PASSWORD=<your-robot-secret>
+kubectl create secret generic harbor-registry-credentials \
+ --from-literal username=$REGISTRY_USERNAME \
+ --from-literal password=$REGISTRY_PASSWORD \
+ --from-file=ca.crt=<(kubectl -n kommander get kommandercluster host-cluster -o jsonpath='{.status.ingress.caBundle}' | base64 -d)
+```
+
+
+- We will now need to edit the Cluster YAML to update the image registry address to Harbor's URL
+```sh
+kubectl edit cluster <WORKLOAD_CLUSTER_NAME>
+```
+- This will open up the Cluster YAML in vi. Navigate to `spec.topology.variables.imageRegistries`:
+    - Replace `url` with your Harbor URL appended with `/library`
+    - Replace `imageRegistries.credentials.secretRef.name` value with the name of the credential we just created `harbor-registry-credentials`.
+- Save and exit the yaml.
+![Harbor Edit Cluster YAML](./images/harbor-cluster-yaml.png)
+
+- Give this some time as editing the Cluster YAML will perform a rolling update as it brings up and down the various nodes in the cluster. You can watch the progress of this:
+```sh
+kubectl get nodes -w
+```
+- Example output:
+```sh
+NAME                                    STATUS                     ROLES           AGE     VERSION
+jn-nkp-cluster-md-0-mdt98-2j8vp-ptjt2   Ready,SchedulingDisabled   <none>          4d      v1.31.4
+jn-nkp-cluster-md-0-mdt98-2j8vp-rqr6n   Ready                      <none>          4d      v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-cvx7j   Ready                      <none>          9m11s   v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-qht8k   Ready                      <none>          50s     v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-tn9g2   Ready                      <none>          3m25s   v1.31.4
+jn-nkp-cluster-pmxmb-8kq7f              Ready                      control-plane   4m29s   v1.31.4
+jn-nkp-cluster-pmxmb-8r6cl              Ready                      control-plane   8m46s   v1.31.4
+jn-nkp-cluster-pmxmb-gvcgp              NotReady                   control-plane   21s     v1.31.4
+jn-nkp-cluster-pmxmb-hgllf              Ready                      control-plane   4d18h   v1.31.4
+```
+
+- The following is what it should look like when all nodes are ready:
+```sh
+kubectl get nodes
+```
+
+```sh
+NAME                                    STATUS   ROLES           AGE     VERSION
+jn-nkp-cluster-md-0-mdt98-pwlfz-cvx7j   Ready    <none>          18m     v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-qht8k   Ready    <none>          10m     v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-tn9g2   Ready    <none>          12m     v1.31.4
+jn-nkp-cluster-md-0-mdt98-pwlfz-vpbwl   Ready    <none>          8m10s   v1.31.4
+jn-nkp-cluster-pmxmb-8kq7f              Ready    control-plane   14m     v1.31.4
+jn-nkp-cluster-pmxmb-8r6cl              Ready    control-plane   18m     v1.31.4
+jn-nkp-cluster-pmxmb-gvcgp              Ready    control-plane   9m54s   v1.31.4
+```
 
 
 
-
-
-
-
-
+- Now to test whether the new registry works as a pull through. Run the following command to create a simple Deployment of nginx.
+```sh
+kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml
+```
 
 
 ## Adding Okta as Identity Provider to the Cluster
 
 ## Troubleshooting Errors
-
-
-
-
-
