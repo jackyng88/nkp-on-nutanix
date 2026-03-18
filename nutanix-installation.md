@@ -80,8 +80,8 @@
 - This is going to perform a simple installation with a bit less customization option through the ``nkp`` cli tool. This utilize an interactive shell window.
 - To further operationalize this deployment with the `nkp` cli you will need to utilize flags for the `nkp` command - especially in tandem with scripts or GitOps configurations - but for the purposes of a quick lab/demo the shell command is fine. It will default a 3 control plane/4 worker plane cluster.
 - The following is an example shell command with more flag options:
-```
-sh
+```sh
+
 nkp create cluster nutanix \
   --cluster-name                              "${CLUSTER_NAME}" \
   --kubernetes-version                        "${KUBERNETES_VERSION}" \
