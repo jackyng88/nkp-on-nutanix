@@ -204,6 +204,23 @@ nkp create cluster nutanix \
   --self-managed
 ```
 
+Look to the end of the next section in Interactive Deployment for an idea of what a successful deployment looks like. 
+**Note**: This 1 control plane and 1 worker node configuration is only for kicking the tires on a simple test/lab deployment to have a cluster up and running. Following is a table that shows the delta in a 1 + 1 setup vs a 3 + 4 setup:
+
+| Concern | 1CP + 1W | 3CP + 4W |
+|---|---|---|
+| API server survives node failure | ❌ | ✅ |
+| Workloads survive node failure | ❌ | ✅ |
+| etcd data safe from single failure | ❌ | ✅ |
+| Rolling upgrades work cleanly | ❌ | ✅ |
+| NKP platform services fully healthy | ⚠️ Likely degraded | ✅ |
+| Prometheus + Alertmanager HA | ❌ Anti-affinity rules leave replicas Pending | ✅ |
+| Loki distributed mode | ❌ Falls back to single replica, no redundancy | ✅ |
+| Traefik ingress redundancy | ❌ Single ingress point, any restart causes downtime | ✅ |
+| Dex / OIDC authentication | ⚠️ Runs but no replica redundancy, outage on restart | ✅ |
+| Gatekeeper policy enforcement | ⚠️ Webhook may block pod scheduling if pod is unavailable | ✅ |
+| Harbor (if enabled) | ❌ Insufficient resources to schedule all required pods | ✅ |
+
 ### Interactive Deployment
 
 In your terminal, run:
