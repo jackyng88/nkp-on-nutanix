@@ -111,7 +111,6 @@ The default cluster topology is **3 control plane nodes + 4 worker nodes**.
 
 ### Example CLI Command (Non-Interactive / Scripted)
 
-> **⚠️ Bash Syntax Warning**: The inline section comments (`# ──`) in multi-line bash commands have been removed below. In bash, a `#` character after a line-continuation backslash (`\`) is **not** treated as a comment — it breaks the command. Always remove comment lines from multi-line bash commands, or define variables beforehand.
 
 ```sh
 nkp create cluster nutanix \
