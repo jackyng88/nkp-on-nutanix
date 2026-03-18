@@ -78,7 +78,60 @@
 
 ## Deploying an NKP Cluster
 - This is going to perform a simple installation with a bit less customization option through the ``nkp`` cli tool. This utilize an interactive shell window.
-- To operationalize this deployment with the `nkp` cli you will need to utilize flags to the `nkp` command - especially in scripts or GitOps configurations - but for the purposes of a quick lab/demo the shell command is fine. It will default a 3 control plane/4 worker plane cluster.
+- To further operationalize this deployment with the `nkp` cli you will need to utilize flags for the `nkp` command - especially in tandem with scripts or GitOps configurations - but for the purposes of a quick lab/demo the shell command is fine. It will default a 3 control plane/4 worker plane cluster.
+- The following is an example shell command with more flag options:
+```
+sh
+nkp create cluster nutanix \
+  --cluster-name                              "${CLUSTER_NAME}" \
+  --kubernetes-version                        "${KUBERNETES_VERSION}" \
+  \
+  # ── Prism Central endpoint ──────────────────────────────────────────
+  --endpoint                                  "${NUTANIX_PC_ENDPOINT}:9440" \
+  --insecure                                  false \
+  \
+  # ── CAPX credentials (VM lifecycle — stored in capx-system Secret) ──
+  --nutanix-username                          "${CAPX_USERNAME}" \
+  --nutanix-password                          "${CAPX_PASSWORD}" \
+  \
+  # ── Infrastructure placement ────────────────────────────────────────
+  --control-plane-prism-element-cluster       "${NUTANIX_PE_CLUSTER}" \
+  --control-plane-subnets                     "${NUTANIX_SUBNET}" \
+  --control-plane-vm-image                    "${NODE_IMAGE_NAME}" \
+  --control-plane-vcpus                       4 \
+  --control-plane-cores-per-vcpu              1 \
+  --control-plane-memory-gib                  16 \
+  --control-plane-disk-gib                    100 \
+  --control-plane-replicas                    3 \
+  --control-plane-endpoint-ip                 "${CONTROL_PLANE_VIP}" \
+  \
+  --worker-prism-element-cluster              "${NUTANIX_PE_CLUSTER}" \
+  --worker-subnets                            "${NUTANIX_SUBNET}" \
+  --worker-vm-image                           "${NODE_IMAGE_NAME}" \
+  --worker-vcpus                              8 \
+  --worker-cores-per-vcpu                     1 \
+  --worker-memory-gib                         32 \
+  --worker-disk-gib                           100 \
+  --worker-replicas                           4 \
+  \
+  # ── CSI credentials (PV lifecycle — stored in kube-system Secret) ───
+  --csi-username                              "${CSI_USERNAME}" \
+  --csi-password                              "${CSI_PASSWORD}" \
+  --csi-storage-container                     "${NUTANIX_STORAGE_CONTAINER}" \
+  --csi-reclaim-policy                        "Retain" \
+  \
+  # ── Networking ──────────────────────────────────────────────────────
+  --kubernetes-service-load-balancer-ip-range "${LB_IP_RANGE}" \
+  --cni                                       "calico" \
+  \
+  # ── SSH access ──────────────────────────────────────────────────────
+  --ssh-public-key-file                       "${SSH_PUBLIC_KEY_FILE}" \
+  \
+  # ── Target the management cluster (post-pivot) ──────────────────────
+  --self-managed \
+  --kubeconfig                                "${KUBECONFIG}"
+```
+- For an exhaustive list on flags visit [here](https://docs.d2iq.com/dkp/2.8/nkp-create-cluster-nutanix) or by running `nkp create cluster nutanix --help`.
 - In your terminal/shell run the following command:
 ```sh
 nkp create cluster nutanix
