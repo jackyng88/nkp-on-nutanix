@@ -9,7 +9,7 @@
 - [Configuring Prism Central Authorization Policy and Role](#configuring-prism-central-authorization-policy-and-role)
 - [Adding a Base Image for use with NKP](#adding-a-base-image-for-use-with-nkp)
 - [Deploying an NKP Cluster](#deploying-an-nkp-cluster)
-- [Adding Harbor Container Registry to the Cluster](#adding-harbor-container-registry-to-the-cluster)
+- [(optional) Adding Harbor Container Registry to the Cluster](#optional-adding-harbor-container-registry-to-the-cluster)
     - [Deploying CloudNativePG](#deploying-cloudnativepg)
     - [Adding Nutanix Object Store](#adding-nutanix-object-store)
 
@@ -229,11 +229,15 @@ kubectl get kommander -n kommander
 export KUBECONFIG=$CLUSTER_NAME-cluster.conf
 ```
 
-
+- When the deployment finishes, unless you specified an `--output-directory` flag, the KUBECONFIG file will be generated in the current working directory.
+- If you need to regenerate the KUBECONFIG file you can run the following command.`Note`: the `$CLUSTER_NAME` is the name you provided earlier during the deployment:
+```sh
+kubectl get secret ${CLUSTER_NAME}-kubeconfig -n default -o jsonpath='{.data.value}' | base64 -d > $CLUSTER_NAME.conf
+```
 
 - Now to test the web GUI url use the following command:
 ```sh
-nkp open dashboard --kubeconfig=${CLUSTER_NAME}-cluster.conf
+nkp open dashboard --kubeconfig=${CLUSTER_NAME}.conf
 ```
 - Once that command is entered, the login page should automatically open in your browser with the following credentials displayed in shell:
 ```sh
@@ -244,9 +248,13 @@ URL: https://<ip-address>/dkp/kommander/dashboard
 
 ![Dex Login Page](./images/dex-login.png)
 
+- To find the credentials again if you happen to lose them, run the following command. The initial credentials live in a secret `dkp-credentials` in the `kommander` namespace:
 
+```sh
+kubectl get secret dkp-credentials -n kommander -o go-template='Username: {{.data.username|base64decode}}{{"\n"}}Password: {{.data.password|base64decode}}{{"\n"}}'
+```
 
-## Adding Harbor Container Registry to the Cluster
+## (Optional) Adding Harbor Container Registry to the Cluster
 - By default NKP clusters do not have their own dedicated internal private registry. NKP with 2.17 now supports Harbor for their internal registry. The following are steps to deploy it into your NKP cluster.
 - Prerequisites:
     - Deploy the Cloud Native Postgres (CloudNativePG) operator and then enabling the CloudNativePG application on the cluster. We will be deploying the CNPG operator through ``Helm`` as it is a good tool to have and use.
