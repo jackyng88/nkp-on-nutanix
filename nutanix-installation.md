@@ -158,6 +158,52 @@ Or visit the [NKP CLI reference](https://docs.d2iq.com/dkp/2.8/nkp-create-cluste
 
 ---
 
+### Smaller Lab Deployment
+For the purposes of a small lab environment in the case of a workshop you'll likely be resource and IP address constrained - in which case the interactive deployment will not be feasible. Here we will use the bare necessary flags to createa cluster for us.
+
+First we will need to set a few **required** environment variables that the `nkp` cli will read. You can create an `.env` file via your preferred text editor i.e.
+`vim nkp.env`
+`code nkp.env`
+
+```sh
+export CLUSTER_NAME="jn-test"
+export NUTANIX_PC_ENDPOINT="https://10.55.62.7:9440"
+export NUTANIX_PE_CLUSTER="DM3-POC062"
+export NUTANIX_SUBNET="primary-DM3-POC062"
+export NODE_IMAGE="nkp-rocky-9.6-release-cis-1.34.3-20260128124330.qcow2"
+export CONTROL_PLANE_VIP="10.55.62.35"
+export LB_IP_RANGE="10.55.62.22-10.55.62.22"
+export NUTANIX_STORAGE_CONTAINER="default"
+export NUTANIX_USER="admin"
+export NUTANIX_PASSWORD='nx2Tech361!'
+```
+**Note**: The `NUTANIX_PASSWORD` environment variable needs to be wrapped with a single quotation due to the `!`. 
+
+And then source it to load the environment variables:
+`source nkp.env`
+
+
+
+Run the following `nkp create cluster nutanix` command. For best practice - replace the values with your own environment variables.
+```sh
+nkp create cluster nutanix \
+  --cluster-name "${CLUSTER_NAME}" \
+  --endpoint "${NUTANIX_PC_ENDPOINT}" \
+  --insecure \
+  --control-plane-prism-element-cluster "${NUTANIX_PE_CLUSTER}" \
+  --control-plane-subnets "${NUTANIX_SUBNET}" \
+  --control-plane-vm-image "${NODE_IMAGE}" \
+  --control-plane-replicas 1 \
+  --control-plane-endpoint-ip "${CONTROL_PLANE_VIP}" \
+  --worker-prism-element-cluster "${NUTANIX_PE_CLUSTER}" \
+  --worker-subnets "${NUTANIX_SUBNET}" \
+  --worker-vm-image "${NODE_IMAGE}" \
+  --worker-replicas 1 \
+  --csi-storage-container "${NUTANIX_STORAGE_CONTAINER}" \
+  --kubernetes-service-load-balancer-ip-range "${LB_IP_RANGE}" \
+  --self-managed
+```
+
 ### Interactive Deployment
 
 In your terminal, run:
@@ -217,6 +263,7 @@ At the **Create NKP Cluster?** prompt, select `Create` and press Enter. The fina
 ![NKP Final Config](./images/nkp-final-config.png)
 
 ---
+
 
 ### Monitoring Cluster Creation
 
