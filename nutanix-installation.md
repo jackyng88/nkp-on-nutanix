@@ -204,7 +204,10 @@ nkp create cluster nutanix \
   --self-managed
 ```
 
+You may notice that there are no flags for `NUTANIX_USER` and `NUTANIX_PASSWORD` - the nkp cli natively reads from those environment variables.
+
 Look to the end of the next section in Interactive Deployment for an idea of what a successful deployment looks like. 
+
 **Note**: This 1 control plane and 1 worker node configuration is only for kicking the tires on a simple test/lab deployment to have a cluster up and running. Following is a table that shows the delta in a 1 + 1 setup vs a 3 + 4 setup:
 
 | Concern | 1CP + 1W | 3CP + 4W |
