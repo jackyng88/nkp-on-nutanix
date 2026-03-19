@@ -10,6 +10,8 @@
 - [Configuring Prism Central Authorization Policy and Role](#configuring-prism-central-authorization-policy-and-role)
 - [Adding a Base Image for use with NKP](#adding-a-base-image-for-use-with-nkp)
 - [Deploying an NKP Cluster](#deploying-an-nkp-cluster)
+  - [Smaller Lab Deployment](#smaller-lab-deployment)
+  - [Interactive Deployment](#interactive-deployment)
 - [Clean-up/Troubleshooting Steps](#clean-uptroubleshooting-steps)
 - [(Optional) Adding Harbor Container Registry to the Cluster](#optional-adding-harbor-container-registry-to-the-cluster)
     - [Deploying CloudNativePG](#deploying-cloudnativepg)
