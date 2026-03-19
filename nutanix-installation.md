@@ -176,6 +176,9 @@ export LB_IP_RANGE="10.55.62.22-10.55.62.22"
 export NUTANIX_STORAGE_CONTAINER="default"
 export NUTANIX_USER="admin"
 export NUTANIX_PASSWORD='nx2Tech361!'
+export DOCKER_USERNAME="yourdockerusernamex"
+export DOCKER_PASSWORD="yourdockerpassword"
+export DOCKER_SERVER="https://registry-1.docker.io"
 ```
 **Note**: The `NUTANIX_PASSWORD` environment variable needs to be wrapped with a single quotation due to the `!`. 
 
@@ -201,6 +204,9 @@ nkp create cluster nutanix \
   --worker-replicas 1 \
   --csi-storage-container "${NUTANIX_STORAGE_CONTAINER}" \
   --kubernetes-service-load-balancer-ip-range "${LB_IP_RANGE}" \
+  --registry-url "${DOCKER_SERVER}" \
+  --registry-username "${DOCKER_USERNAME}" \
+  --registry-password "${DOCKER_PASSWORD}" \
   --self-managed
 ```
 
@@ -431,6 +437,27 @@ kubectl get secret dkp-credentials -n kommander \
 ```
 
 ![Dex Login Page](./images/dex-login.png)
+
+---
+
+### Clean-up/Troubleshooting Steps
+
+There will be times when your cluster fails to deploy because of various reasons, here are some ways to clean up resources:
+
+If your cluster times out or fails during the deployment and there exists a <cluster-name>-bootstrap.conf file run the following to delete the lingering resources and there still exists a bootstrap cluster:
+
+```sh
+nkp delete cluster -c <cluster-name> --kubeconfig <cluster-name>-bootstrap.conf
+```
+
+To delete the cluster if it fails or times out after the bootstrap cluster has been torn down and resources are being pivoted to the new management cluster:
+
+```sh
+nkp delete cluster -c <cluster-name> --kubeconfig <cluster-name>.conf
+```
+
+
+
 
 ---
 
