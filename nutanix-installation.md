@@ -4,11 +4,13 @@
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
+- [Creating a Personal Access Token in Docker Hub](#creating-a-personal-access-token-in-docker-hub)
 - [Setting up a Subnet in Prism Central](#setting-up-a-subnet-in-prism-central)
 - [Creating a Storage Container in Prism Central](#creating-a-storage-container-in-prism-central)
 - [Configuring Prism Central Authorization Policy and Role](#configuring-prism-central-authorization-policy-and-role)
 - [Adding a Base Image for use with NKP](#adding-a-base-image-for-use-with-nkp)
 - [Deploying an NKP Cluster](#deploying-an-nkp-cluster)
+- [Clean-up/Troubleshooting Steps](#clean-uptroubleshooting-steps)
 - [(Optional) Adding Harbor Container Registry to the Cluster](#optional-adding-harbor-container-registry-to-the-cluster)
     - [Deploying CloudNativePG](#deploying-cloudnativepg)
     - [Adding Nutanix Object Store](#adding-nutanix-object-store)
