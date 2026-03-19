@@ -29,6 +29,7 @@
   - On arm64 macOS, Rancher Desktop with `QEMU` emulation and `dockerd` as the container runtime has been validated.
   - The container runtime engine (CRE) allows your laptop to act as a bastion host for a KinD (Kubernetes in Docker) bootstrap cluster, which is used transiently during NKP deployment.
   - For convenience, add the `nkp` binary (and your container CLI) to your `PATH` environment variable rather than referencing its full path each time.
+- You may need to create a free Dockerhub account to by-pass some Docker Hub rate limits as the cluster builds itself. You can go here at [Docker Hub](https://hub.docker.com/)
 - (Optional) A container registry for your environment.
   - For air-gapped deployments, your bastion host must be able to push air-gapped bundles to an external registry such as Harbor.
 - A valid Nutanix account with Prism Central administrator access, specifically for:
@@ -49,6 +50,16 @@
   ```
 
 ---
+
+## Creating a Personal Access Token in Docker Hub
+1. Sign up/register for an account and then log in.
+2. When logged in, navigate to the top-right profile picture and click it. Select **Account Settings**.
+3. Then under the left-hand side menu, select **Settings** and then under it select **Personal Access Tokens**.
+4. At the top-right click the **Generate new token** and then input a new name for your token in the Description.
+5. For **Access Permission** you can give it the default *Public Repo Read-only*.
+6. Click **Generate** and make sure you save the value of the **Personal Access Token** as you may not see the value of it again from the GUI.
+7. This personal access token value will be used for the `DOCKER_PASSWORD` later, as well as your Docker hub user name for `DOCKER_USERNAME`.
+
 
 ## Setting up a Subnet in Prism Central
 > **Note**: A subnet with DHCP/Nutanix IPAM enabled and an IP pool is strongly recommended. These IPs are used to provision NKP Node VMs. Deploying baremetal/pre-provisioned VMs with static IPs is possible but not advised for standard deployments.
